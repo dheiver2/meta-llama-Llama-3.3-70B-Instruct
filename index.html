@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat com Llama</title>
+    <style>
+        :root {
+            --bg-primary: #343541;
+            --bg-secondary: #444654;
+            --text-primary: #FFFFFF;
+            --input-bg: #40414F;
+            --border-color: #565869;
+            --accent-color: #10A37F;
+            --error-color: #ff4444;
+            --user-avatar: #5436DA;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #FFFFFF;
+            --bg-secondary: #F7F7F8;
+            --text-primary: #000000;
+            --input-bg: #FFFFFF;
+            --border-color: #D9D9E3;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.2rem;
+            font-weight: 500;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .header button {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .header button:hover {
+            background: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            opacity: 0;
+            animation: fadeIn 0.3s ease forwards;
+            border-radius: 8px;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        .user-message {
+            background-color: var(--bg-primary);
+        }
+
+        .assistant-message {
+            background-color: var(--bg-secondary);
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .user-avatar {
+            background-color: var(--user-avatar);
+        }
+
+        .assistant-avatar {
+            background-color: var(--accent-color);
+        }
+
+        .message-content {
+            flex: 1;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            font-size: 15px;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 20px;
+            color: var(--text-primary);
+            text-align: center;
+            font-style: italic;
+            opacity: 0.8;
+        }
+
+        .typing-indicator.active {
+            display: block;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .input-container {
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            background-color: var(--bg-primary);
+            border-top: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .input-box {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .input-box:focus-within {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.2);
+        }
+
+        textarea {
+            width: 100%;
+            padding: 16px;
+            padding-right: 100px;
+            background-color: transparent;
+            border: none;
+            color: var(--text-primary);
+            resize: none;
+            outline: none;
+            font-size: 15px;
+            line-height: 1.5;
+            max-height: 200px;
+        }
+
+        .char-counter {
+            position: absolute;
+            right: 50px;
+            bottom: 14px;
+            font-size: 12px;
+            color: var(--text-primary);
+            opacity: 0.7;
+        }
+
+        .send-button {
+            position: absolute;
+            right: 10px;
+            bottom: 10px;
+            background-color: transparent;
+            border: none;
+            color: var(--accent-color);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-size: 18px;
+        }
+
+        .send-button:hover:not(:disabled) {
+            background-color: rgba(16, 163, 127, 0.1);
+            transform: scale(1.1);
+        }
+
+        .send-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            color: var(--error-color);
+            padding: 12px;
+            text-align: center;
+            background-color: rgba(255, 68, 68, 0.1);
+            border-radius: 6px;
+            margin: 10px auto;
+            max-width: 800px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            .message {
+                padding: 15px;
+            }
+
+            .header h1 {
+                font-size: 1rem;
+            }
+
+            .input-container {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Chat com Llama</h1>
+        <div class="header-controls">
+            <button id="themeToggle">🌓 Tema</button>
+            <button id="clearChat">🗑️ Limpar</button>
+        </div>
+    </div>
+
+    <div class="chat-container" id="chatContainer">
+        <div class="message assistant-message">
+            <div class="avatar assistant-avatar">L</div>
+            <div class="message-content">Olá! Como posso ajudar você hoje?</div>
+        </div>
+    </div>
+
+    <div class="typing-indicator" id="typingIndicator">
+        Llama está digitando...
+    </div>
+
+    <div class="input-container">
+        <div class="input-box">
+            <textarea 
+                id="userInput" 
+                placeholder="Digite sua mensagem aqui... (Pressione Enter para enviar)" 
+                rows="1"
+                maxlength="500"
+            ></textarea>
+            <span class="char-counter" id="charCounter">0/500</span>
+            <button class="send-button" id="sendButton" disabled>➤</button>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // Configuração da API
+            const API_CONFIG = {
+                url: 'https://thziin-meta-llama-llama-3-3-70b-instruct.hf.space',
+                parameters: {
+                    temperature: 0.7,
+                    top_p: 0.9
+                }
+            };
+
+            let elements;
+
+            // Função de inicialização
+            function init() {
+                elements = {
+                    chatContainer: document.getElementById('chatContainer'),
+                    userInput: document.getElementById('userInput'),
+                    sendButton: document.getElementById('sendButton'),
+                    themeToggle: document.getElementById('themeToggle'),
+                    clearChat: document.getElementById('clearChat'),
+                    typingIndicator: document.getElementById('typingIndicator'),
+                    charCounter: document.getElementById('charCounter')
+                };
+
+                elements.userInput.addEventListener('input', () => {
+                    adjustTextareaHeight();
+                    updateCharCounter();
+                });
+                elements.sendButton.addEventListener('click', handleSubmit);
+                elements.userInput.addEventListener('keydown', handleKeyPress);
+                elements.themeToggle.addEventListener('click', toggleTheme);
+                elements.clearChat.addEventListener('click', clearChat);
+
+                if (localStorage.getItem('theme') === 'light') {
+                    document.body.setAttribute('data-theme', 'light');
+                }
+            }
+
+            async function getLlamaResponse(message) {
+                try {
+                    // Simulando resposta para demonstração
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    const respostas = [
+                        "Compreendo sua pergunta. Deixe-me ajudar com isso...",
+                        "Interessante! Aqui está minha perspectiva sobre o assunto...",
+                        "Bom ponto! Vou explicar em detalhes...",
+                        "Entendi o que você quer dizer. Vamos analisar juntos...",
+                        "Ótima pergunta! Vou responder da forma mais clara possível..."
+                    ];
+                    return respostas[Math.floor(Math.random() * respostas.length)] + "\n\n" + message;
+
+                    /* Código real da API
+                    const response = await fetch(`${API_CONFIG.url}/generate_response`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            input_text: message,
+                            temperature: API_CONFIG.parameters.temperature,
+                            top_p: API_CONFIG.parameters.top_p
+                        })
+                    });
+
+                    if (!response.ok) throw new Error('Erro na comunicação com o modelo');
+                    const data = await response.json();
+                    return data;
+                    */
+
+                } catch (error) {
+                    console.error('Erro:', error);
+                    showError('Desculpe, houve um erro ao processar sua mensagem. Tente novamente.');
+                    return null;
+                }
+            }
+
+            function showError(message) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = message;
+                elements.chatContainer.appendChild(errorDiv);
+                
+                setTimeout(() => errorDiv.remove(), 5000);
+            }
+
+            function toggleTheme() {
+                const currentTheme = document.body.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? null : 'light';
+                document.body.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme || 'dark');
+            }
+
+            function clearChat() {
+                if (confirm('Tem certeza que deseja limpar o chat?')) {
+                    const firstMessage = elements.chatContainer.firstElementChild;
+                    elements.chatContainer.innerHTML = '';
+                    elements.chatContainer.appendChild(firstMessage);
+                }
+            }
+
+            function updateCharCounter() {
+                const length = elements.userInput.value.length;
+                elements.charCounter.textContent = `${length}/500`;
+            }
+
+            function adjustTextareaHeight() {
+                const textarea = elements.userInput;
+                textarea.style.height = 'auto';
+                textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+                elements.sendButton.disabled = textarea.value.trim() === '';
+            }
+
+            function addMessage(content, isUser) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
+                
+                const avatar = document.createElement('div');
+                avatar.className = `avatar ${isUser ? 'user-avatar' : 'assistant-avatar'}`;
+                avatar.textContent = isUser ? 'U' : 'L';
+                
+                const messageContent = document.createElement('div');
+                messageContent.className = 'message-content';
+                messageContent.textContent = content;
+                
+                messageDiv.appendChild(avatar);
+                messageDiv.appendChild(messageContent);
+                elements.chatContainer.appendChild(messageDiv);
+                
+                elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+            }
+
+            async function handleSubmit() {
+                const message = elements.userInput.value.trim();
+                if (message === '') return;
+
+                elements.sendButton.disabled = true;
+                elements.userInput.disabled = true;
+
+                addMessage(message, true);
+                
+                elements.typingIndicator.classList.add('active');
+                
+                const response = await getLlamaResponse(message);
+                
+                elements.typingIndicator.classList.remove('active');
+
+                if (response) {
+                    addMessage(response, false);
+                }
+
+                elements.userInput.value = '';
+                elements.userInput.disabled = false;
+                updateCharCounter();
+                adjustTextareaHeight();
+                elements.userInput.focus();
+            }
+
+            function handleKeyPress(e) {
+                if (e.key === 'Enter' && !e.shiftKey && !elements.userInput.disabled) {
+                    e.preventDefault();
+                    handleSubmit();
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', init);
+        })();
+    </script>
+</body>
+</html>
